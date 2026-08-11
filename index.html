@@ -408,12 +408,14 @@ function hasFilters() { return !!(filterType || filterCategory.length > 0 || fil
 function getFilteredTxns() {
   return allTxns.filter(function(t) {
     if (!t.date) return false;
-    var monthMatch = t.date.startsWith(currentMonth);
-    if (!monthMatch) return false;
+    if (!t.date.startsWith(currentMonth)) return false;
     if (filterType && t.type !== filterType) return false;
-    if (filterCategory.length > 0 && filterCategory.indexOf(t.category) < 0) return false;
-    if (filterPayment && t.payment !== filterPayment) return false;
-    if (filterWho && t.who !== filterWho) return false;
+    // Category, payment, and who filters only apply to EXPENSES
+    if (t.type === 'expense') {
+      if (filterCategory.length > 0 && filterCategory.indexOf(t.category) < 0) return false;
+      if (filterPayment && t.payment !== filterPayment) return false;
+      if (filterWho && t.who !== filterWho) return false;
+    }
     return true;
   });
 }
