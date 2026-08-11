@@ -297,7 +297,6 @@ body {
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 
 <script>
 const firebaseConfig = {
@@ -312,7 +311,6 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 var db = firebase.database();
-var auth = firebase.auth();
 
 // State
 var currentType = 'expense';
@@ -368,29 +366,22 @@ document.getElementById('header-month').textContent = getMonthLabel();
 renderCategorySelect();
 updateConnStatus('Conectando...', '#ff9500');
 
-// Auth + DB
-auth.signInAnonymously().then(function() {
-  console.log('Auth ok');
-  var txnRef = db.ref('financas/transactions');
-  txnRef.on('value', function(snapshot) {
-    dbReady = true;
-    updateConnStatus('● Conectado', '#34c759');
-    var data = snapshot.val() || {};
-    allTxns = Object.keys(data).map(function(id) {
-      var t = data[id];
-      t.id = id;
-      return t;
-    });
-    renderFromData();
-  }, function(err) {
-    console.error('DB error:', err);
-    updateConnStatus('● Erro: ' + (err.message || 'conexão'), '#ff3b30');
-    document.getElementById('recent-list').innerHTML = '<div class="empty">Erro ao conectar: ' + (err.message || 'verifique sua internet') + '<br><br><button onclick="location.reload()" style="background:#2563eb;color:#fff;border:none;padding:12px 24px;border-radius:10px;font-size:14px;cursor:pointer;">🔄 Tentar novamente</button></div>';
+// Direct DB access
+var txnRef = db.ref('financas/transactions');
+txnRef.on('value', function(snapshot) {
+  dbReady = true;
+  updateConnStatus('● Conectado', '#34c759');
+  var data = snapshot.val() || {};
+  allTxns = Object.keys(data).map(function(id) {
+    var t = data[id];
+    t.id = id;
+    return t;
   });
-}).catch(function(err) {
-  console.error('Auth error:', err);
-  updateConnStatus('● Erro auth: ' + err.message, '#ff3b30');
-  document.getElementById('dash-cards').innerHTML = '<div class="empty">Erro de autenticação. Recarregue a página.</div>';
+  renderFromData();
+}, function(err) {
+  console.error('DB error:', err);
+  updateConnStatus('● Erro: ' + (err.message || 'conexão'), '#ff3b30');
+  document.getElementById('recent-list').innerHTML = '<div class="empty">Erro ao conectar: ' + (err.message || 'verifique sua internet') + '<br><br><button onclick="location.reload()" style="background:#2563eb;color:#fff;border:none;padding:12px 24px;border-radius:10px;font-size:14px;cursor:pointer;">🔄 Tentar novamente</button></div>';
 });
 
 function updateConnStatus(msg, color) {
