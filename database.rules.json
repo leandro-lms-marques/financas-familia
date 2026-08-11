@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "families": {
+      ".read": false,
+      ".write": false,
+      "$code": {
+        ".read": true,
+        ".write": true,
+        "profiles": {
+          ".indexOn": ["name"]
+        }
+      }
+    },
+    "financas": {
+      ".read": true,
+      ".write": true,
+      "transactions": {
+        ".indexOn": ["date", "type"]
+      }
+    }
+  }
+}
