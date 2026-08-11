@@ -251,8 +251,8 @@ var db = firebase.database();
 // === STATE ===
 var currentType = 'expense', currentWho = 'leandro', editingId = null, allTxns = [], currentScreen = 'dash';
 var currentMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
-var filterType = '', filterCategory = '', filterPayment = '', filterWho = '';
-var pendingFilterType = '', pendingFilterCat = '', pendingFilterPay = '', pendingFilterWho = '';
+var filterType = '', filterCategory = [], filterPayment = '', filterWho = '';
+var pendingFilterType = '', pendingFilterCat = [], pendingFilterPay = '', pendingFilterWho = '';
 var filterOpen = false;
 
 // === CATEGORIES ===
@@ -312,8 +312,8 @@ function nextMonth() {
 
 // === FILTERS ===
 function buildFilterPanel() {
-  // Category chips
-  var catHtml = '<button data-v="" class="active">Todas</button>';
+  // Category chips - multi-select
+  var catHtml = '<button data-v="__all__" class="active">Todas</button>';
   expenseCategories.forEach(function(c) { catHtml += '<button data-v="' + c.id + '">' + c.icon + ' ' + c.name + '</button>'; });
   incomeCategories.forEach(function(c) { catHtml += '<button data-v="' + c.id + '">' + c.icon + ' ' + c.name + '</button>'; });
   document.getElementById('filter-cat').innerHTML = catHtml;
@@ -323,9 +323,34 @@ function buildFilterPanel() {
   document.getElementById('filter-pay').innerHTML = payHtml;
   // Add click handlers
   addChipHandlers('filter-type', 'pendingFilterType');
-  addChipHandlers('filter-cat', 'pendingFilterCat');
+  addCatChipHandlers();
   addChipHandlers('filter-pay', 'pendingFilterPay');
   addChipHandlers('filter-who', 'pendingFilterWho');
+}
+function addCatChipHandlers() {
+  var container = document.getElementById('filter-cat');
+  container.querySelectorAll('button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var v = this.getAttribute('data-v');
+      if (v === '__all__') {
+        // Clear all
+        pendingFilterCat = [];
+        container.querySelectorAll('button').forEach(function(b) { b.classList.toggle('active', b === btn); });
+      } else {
+        // Remove "Todas" if it's active
+        container.querySelector('button[data-v="__all__"]').classList.remove('active');
+        // Toggle this category
+        var idx = pendingFilterCat.indexOf(v);
+        if (idx >= 0) { pendingFilterCat.splice(idx, 1); this.classList.remove('active'); }
+        else { pendingFilterCat.push(v); this.classList.add('active'); }
+        // If nothing selected, activate "Todas"
+        if (pendingFilterCat.length === 0) {
+          pendingFilterCat = [];
+          container.querySelector('button[data-v="__all__"]').classList.add('active');
+        }
+      }
+    });
+  });
 }
 function addChipHandlers(containerId, pendingVar) {
   var container = document.getElementById(containerId);
@@ -341,13 +366,21 @@ function toggleFilter() {
   filterOpen = !filterOpen;
   document.getElementById('filter-overlay').classList.toggle('show', filterOpen);
   if (filterOpen) {
-    pendingFilterType = filterType; pendingFilterCat = filterCategory;
+    pendingFilterType = filterType; pendingFilterCat = filterCategory.slice();
     pendingFilterPay = filterPayment; pendingFilterWho = filterWho;
     syncChips('filter-type', pendingFilterType);
-    syncChips('filter-cat', pendingFilterCat);
+    syncCatChips(pendingFilterCat);
     syncChips('filter-pay', pendingFilterPay);
     syncChips('filter-who', pendingFilterWho);
   }
+}
+function syncCatChips(arr) {
+  var container = document.getElementById('filter-cat');
+  container.querySelectorAll('button').forEach(function(b) {
+    var v = b.getAttribute('data-v');
+    if (v === '__all__') { b.classList.toggle('active', arr.length === 0); }
+    else { b.classList.toggle('active', arr.indexOf(v) >= 0); }
+  });
 }
 function syncChips(id, val) {
   var c = document.getElementById(id);
@@ -356,20 +389,20 @@ function syncChips(id, val) {
   });
 }
 function applyFilters() {
-  filterType = pendingFilterType; filterCategory = pendingFilterCat;
+  filterType = pendingFilterType; filterCategory = pendingFilterCat.slice();
   filterPayment = pendingFilterPay; filterWho = pendingFilterWho;
   filterOpen = false;
   document.getElementById('filter-overlay').classList.remove('show');
   renderAll();
 }
 function resetFilters() {
-  filterType = ''; filterCategory = ''; filterPayment = ''; filterWho = '';
-  pendingFilterType = ''; pendingFilterCat = ''; pendingFilterPay = ''; pendingFilterWho = '';
+  filterType = ''; filterCategory = []; filterPayment = ''; filterWho = '';
+  pendingFilterType = ''; pendingFilterCat = []; pendingFilterPay = ''; pendingFilterWho = '';
   filterOpen = false;
   document.getElementById('filter-overlay').classList.remove('show');
   renderAll();
 }
-function hasFilters() { return !!(filterType || filterCategory || filterPayment || filterWho); }
+function hasFilters() { return !!(filterType || filterCategory.length > 0 || filterPayment || filterWho); }
 
 function getFilteredTxns() {
   return allTxns.filter(function(t) {
@@ -377,7 +410,7 @@ function getFilteredTxns() {
     var monthMatch = t.date.startsWith(currentMonth);
     if (!monthMatch) return false;
     if (filterType && t.type !== filterType) return false;
-    if (filterCategory && t.category !== filterCategory) return false;
+    if (filterCategory.length > 0 && filterCategory.indexOf(t.category) < 0) return false;
     if (filterPayment && t.payment !== filterPayment) return false;
     if (filterWho && t.who !== filterWho) return false;
     return true;
@@ -400,9 +433,11 @@ function updateFilterUI() {
   btn.textContent = hasFilters() ? '🔍 Filtros' : '🔍';
   var chipsHtml = '';
   if (filterType) chipsHtml += '<span class="filter-chip" onclick="filterType=\'\';renderAll()">' + (filterType==='expense'?'📤 Despesas':'📥 Receitas') + ' <span class="remove">×</span></span>';
-  if (filterCategory) {
-    var c = expenseCategories.concat(incomeCategories).find(function(x){return x.id===filterCategory;});
-    if (c) chipsHtml += '<span class="filter-chip" onclick="filterCategory=\'\';renderAll()">' + c.icon + ' ' + c.name + ' <span class="remove">×</span></span>';
+  if (filterCategory.length > 0) {
+    filterCategory.forEach(function(catId) {
+      var c = expenseCategories.concat(incomeCategories).find(function(x){return x.id===catId;});
+      if (c) chipsHtml += '<span class="filter-chip" onclick="filterCategory=filterCategory.filter(function(x){return x!==\''+catId+'\';});renderAll()">' + c.icon + ' ' + c.name + ' <span class="remove">×</span></span>';
+    });
   }
   if (filterPayment) {
     var p = paymentMethods.find(function(x){return x.id===filterPayment;});
